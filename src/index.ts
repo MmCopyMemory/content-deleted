@@ -1,4 +1,4 @@
-import { Client, Collection, DMChannel, TextChannel, Message } from "discord.js-selfbot-v13";
+import { Client, DMChannel, TextChannel, Message, type ChannelLogsQueryOptions, type Snowflake, Channel, type AnyChannel } from "discord.js-selfbot-v13";
 import { configDotenv } from "dotenv";
 configDotenv();
 
@@ -10,12 +10,11 @@ DM EXCLUSION ->
 USER_ID
 */
 
-const GUILD_EXCLUDE = [
-    ["992106461775798322", "992106461775798325"],
-];
-const DM_EXCLUDE = [
-    "1365788302027919430",
-];
+const EXCLUDED_GUILDS = new Set<Snowflake>([]);
+const EXCLUDED_DMS = new Set<Snowflake>([]);
+const EXCLUDED_CHANNELS = new Set<Snowflake>([]);
+
+const SAFE_MODE = true;
 
 const client = new Client();
 
@@ -23,85 +22,61 @@ client.on("ready", () => {
     console.log(`Logged in as ${client.user!.username}`);
 });
 
-client.on("messageCreate", async (message: Message) => {
-    if (message.author.id !== client.user?.id) return;
+function timeout(ms: number) {
+    return new Promise((res) => setTimeout(res, ms));
+}
 
-    if (message.content.toLowerCase().startsWith("!nuke")) {
-        const excludedGuilds = new Set(
-            GUILD_EXCLUDE.filter(([_, c]) => c === "0").map(([g]) => g)
-        );
-        
-        const excludedChannels = new Set(
-            GUILD_EXCLUDE.filter(([_, c]) => c !== "0").map(([g, c]) => `${g}_${c}`)
-        );
-        
-        for (const guild of client.guilds.cache.values()) {
-            if (excludedGuilds.has(guild.id)) continue;
-            
-            for (const channel of guild.channels.cache.values()) {
-                if (channel.type !== "GUILD_TEXT") continue;
+function isDM(channel: AnyChannel): channel is DMChannel {
+    return channel.type === "DM" || channel.type === "GROUP_DM";
+}
 
-                const key = `${guild.id}_${channel.id}`;
-                if (excludedChannels.has(key)) continue;
+async function nuke(channels: Iterable<AnyChannel>, types: Set<String>) {
+    for (const channel of channels) {
+        if (!channel.isText()) continue;
+        if (!types.has(channel.type)) continue;
+        if (EXCLUDED_CHANNELS.has(channel.id)) continue;
+        if (EXCLUDED_DMS.has(channel.id)) continue;
+        if (isDM(channel) && EXCLUDED_DMS.has(channel.recipient?.id ?? "")) continue;
 
-                try {
-                    let lastMessageId: string | undefined = undefined;
-                    while (true) {
-                        const fetchOptions: { limit: number; before?: string } = { limit: 100 }; // discords limit :( currently "bypassing" by refetching until no more return
-                        if (lastMessageId) fetchOptions.before = lastMessageId;
+        try {
+            let lastMessageId: string | undefined = undefined;
+            while (true) {
+                // discords limit :( currently "bypassing" by refetching until no more return
+                const fetchOptions: ChannelLogsQueryOptions = {
+                    limit: 100,
+                    before: lastMessageId
+                };
 
-                        const fetched: Collection<string, Message> = await (channel as TextChannel).messages.fetch(fetchOptions);
+                const fetched = await channel.messages.fetch(fetchOptions);
+                if (fetched.size === 0) break;
+                const userMessages = fetched.filter((m: Message) => m.author.id === client.user?.id);
 
-                        if (fetched.size === 0) break;
-
-                        const userMessages = fetched.filter((m: Message) => m.author.id === client.user?.id);
-
-                        for (const msg of userMessages.values()) {
-                            await msg.delete();
-                            if (SafeMode) await new Promise(res => setTimeout(res, 1000));
-                        }
-
-                        lastMessageId = fetched.last()?.id;
-                        if (!lastMessageId) break;
-                    }
-                } catch {
-                    // ...
+                for (const msg of userMessages.values()) {
+                    await msg.delete();
+                    if (SAFE_MODE) await timeout(1000);
                 }
+
+                lastMessageId = fetched.last()?.id;
+                if (!lastMessageId) break;
             }
-        }
-        
-        for (const channel of client.channels.cache.values()) {
-            if (channel.type !== "GROUP_DM" && channel.type !== "DM") continue;
-
-            const dmChannel = channel as DMChannel;
-
-            if (DM_EXCLUDE.includes(dmChannel.recipient?.id ?? "")) continue;
-
-            try {
-                let lastMessageId: string | undefined = undefined;
-                while (true) {
-                    const fetchOptions: { limit: number; before?: string } = { limit: 100 };
-                    if (lastMessageId) fetchOptions.before = lastMessageId;
-
-                    const fetched: Collection<string, Message> = await dmChannel.messages.fetch(fetchOptions);
-
-                    if (fetched.size === 0) break;
-
-                    const userMessages = fetched.filter((m: Message) => m.author.id === client.user?.id);
-
-                    for (const msg of userMessages.values()) {
-                        await msg.delete();
-                        if (SafeMode) await new Promise(res => setTimeout(res, 1000));
-                    }
-
-                    lastMessageId = fetched.last()?.id;
-                    if (!lastMessageId) break;
-                }
-            } catch {
-                // ...
-            }
+        } catch {
+            // handle this later
         }
     }
+}
+
+client.on("messageCreate", async (message: Message) => {
+    if (message.author.id !== client.user?.id) return;
+    if (!message.content.toLowerCase().startsWith("!nuke")) return;
+
+    const excludedGuilds = new Set(EXCLUDED_GUILDS);
+    
+    for (const guild of client.guilds.cache.values()) {
+        if (excludedGuilds.has(guild.id)) continue;
+        nuke(guild.channels.cache.values(), new Set(["GUILD_TEXT"]));
+    }
+    
+    nuke(client.channels.cache.values(), new Set(["DM", "GROUP_DM"]))
 });
 
 client.login(process.env["DISCORD_TOKEN"]);
