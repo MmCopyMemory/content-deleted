@@ -4,8 +4,8 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"compile": "tsc && bun run out/index.js",
-		"dev": "nodemon --watch src -e ts --exec 'bun run compile'"
+		"dev": "nodemon --watch src -e ts --exec 'bun run start'",
+		"start": "tsc && bun run out"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
@@ -16,6 +16,7 @@
 	},
 	"dependencies": {
 		"discord.js-selfbot-v13": "^3.6.1",
-		"dotenv": "^16.5.0"
+		"dotenv": "^16.5.0",
+		"json5": "^2.2.3"
 	}
 }

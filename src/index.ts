@@ -1,26 +1,45 @@
-import { Client, DMChannel, TextChannel, Message, type ChannelLogsQueryOptions, type Snowflake, Channel, type AnyChannel } from "discord.js-selfbot-v13";
+import { Client, DMChannel, Message, type ChannelLogsQueryOptions, type Snowflake, type AnyChannel } from "discord.js-selfbot-v13";
 import { configDotenv } from "dotenv";
+import JSON5 from "json5";
+import assert from "node:assert";
+import fs from "node:fs"
+
 configDotenv();
 
-/*
-GUILD EXCLUSION ->
-GUILD_ID , CHANNEL_ID
+interface Config {
+    exclusion_mode: "whitelist" | "blacklist";
+    excluded_guilds: Snowflake[];
+    excluded_dms: Snowflake[];
+    excluded_channels: Snowflake[];
 
-DM EXCLUSION ->
-USER_ID
-*/
+    safe_mode: boolean;
+}
 
-const EXCLUDED_GUILDS = new Set<Snowflake>([]);
-const EXCLUDED_DMS = new Set<Snowflake>([]);
-const EXCLUDED_CHANNELS = new Set<Snowflake>([]);
+const CONFIG_FILE = "config.json";
 
-const SAFE_MODE = true;
+let excludedGuilds = new Set<Snowflake>();
+let excludedDMs = new Set<Snowflake>();
+let excludedChannels = new Set<Snowflake>();
+let mode: Config["exclusion_mode"] = "blacklist";
+let safeMode = false;
 
-const client = new Client();
+function loadConfig() {
+    assert(fs.existsSync(CONFIG_FILE));
 
-client.on("ready", () => {
-    console.log(`Logged in as ${client.user!.username}`);
-});
+    const file = fs.readFileSync(CONFIG_FILE);
+    const parsed: Config = JSON5.parse(file.toString());
+    assert(typeof parsed.excluded_guilds === "object");
+    assert(typeof parsed.excluded_dms === "object");
+    assert(typeof parsed.excluded_channels === "object");
+    assert(typeof parsed.safe_mode === "boolean");
+    assert(["whitelist", "blacklist"].includes(parsed.exclusion_mode));
+
+    excludedGuilds = new Set(parsed.excluded_guilds);
+    excludedDMs = new Set(parsed.excluded_dms);
+    excludedChannels = new Set(parsed.excluded_channels);
+    safeMode = parsed.safe_mode;
+    mode = parsed.exclusion_mode;
+}
 
 function timeout(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
@@ -30,13 +49,20 @@ function isDM(channel: AnyChannel): channel is DMChannel {
     return channel.type === "DM" || channel.type === "GROUP_DM";
 }
 
+function shouldWipe(id: Snowflake, list: Set<Snowflake>) {
+    if (mode === "whitelist")
+        return list.has(id);
+    else
+        return !list.has(id);
+}
+
 async function nuke(channels: Iterable<AnyChannel>, types: Set<String>) {
     for (const channel of channels) {
         if (!channel.isText()) continue;
         if (!types.has(channel.type)) continue;
-        if (EXCLUDED_CHANNELS.has(channel.id)) continue;
-        if (EXCLUDED_DMS.has(channel.id)) continue;
-        if (isDM(channel) && EXCLUDED_DMS.has(channel.recipient?.id ?? "")) continue;
+        if (!shouldWipe(channel.id, excludedChannels)) continue;
+        if (!shouldWipe(channel.id, excludedDMs)) continue;
+        if (isDM(channel) && !shouldWipe(channel.recipient?.id ?? "\0", excludedDMs)) continue;
 
         try {
             let lastMessageId: string | undefined = undefined;
@@ -49,11 +75,11 @@ async function nuke(channels: Iterable<AnyChannel>, types: Set<String>) {
 
                 const fetched = await channel.messages.fetch(fetchOptions);
                 if (fetched.size === 0) break;
-                const userMessages = fetched.filter((m: Message) => m.author.id === client.user?.id);
+                const userMessages = fetched.filter((m: Message) => m.author.id === client.user!.id);
 
                 for (const msg of userMessages.values()) {
                     await msg.delete();
-                    if (SAFE_MODE) await timeout(1000);
+                    if (safeMode) await timeout(1000);
                 }
 
                 lastMessageId = fetched.last()?.id;
@@ -65,18 +91,19 @@ async function nuke(channels: Iterable<AnyChannel>, types: Set<String>) {
     }
 }
 
+const client = new Client();
+
 client.on("messageCreate", async (message: Message) => {
-    if (message.author.id !== client.user?.id) return;
+    if (message.author.id !== client.user!.id) return;
     if (!message.content.toLowerCase().startsWith("!nuke")) return;
 
-    const excludedGuilds = new Set(EXCLUDED_GUILDS);
-    
     for (const guild of client.guilds.cache.values()) {
-        if (excludedGuilds.has(guild.id)) continue;
+        if (!shouldWipe(guild.id, excludedGuilds)) continue;
         nuke(guild.channels.cache.values(), new Set(["GUILD_TEXT"]));
     }
     
-    nuke(client.channels.cache.values(), new Set(["DM", "GROUP_DM"]))
+    nuke(client.channels.cache.values(), new Set(["DM", "GROUP_DM"]));
 });
 
+loadConfig();
 client.login(process.env["DISCORD_TOKEN"]);
