@@ -5,5 +5,5 @@
     "excluded_guilds": [], // guilds that shouldn't get wiped
     "excluded_channels": [], // channels that shouldn't get wiped
     "excluded_dms": [], // dms that shouldn't get wiped
-    "safe_mode": true // don't turn off if you don't want to get rate limited
+    "safe_mode": false // don't turn off if you don't want to get rate limited
 }
