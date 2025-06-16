@@ -60,10 +60,15 @@ async function nuke(channels: Iterable<AnyChannel>, types: Set<String>) {
     for (const channel of channels) {
         if (!channel.isText()) continue;
         if (!types.has(channel.type)) continue;
-        if (!shouldWipe(channel.id, excludedChannels)) continue;
-        if (!shouldWipe(channel.id, excludedDMs)) continue;
-        if (isDM(channel) && !shouldWipe(channel.recipient?.id ?? "\0", excludedDMs)) continue;
-
+        const channelId = channel.id;
+        if (channel.type === "GUILD_TEXT" || channel.type === "GUILD_NEWS") {
+            const guildId = channel.guild.id;
+            if (!shouldWipe(guildId, excludedGuilds)) continue;
+            if (!shouldWipe(channelId, excludedChannels)) continue;
+        } else if (isDM(channel)) {
+            const recipientId = channel.recipient?.id;
+            if (!recipientId || !shouldWipe(recipientId, excludedDMs)) continue;
+        }
         try {
             let lastMessageId: string | undefined = undefined;
             while (true) {
