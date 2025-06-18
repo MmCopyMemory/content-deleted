@@ -19,30 +19,36 @@ Content Deleted is a Discord message deletion tool that deletes **every message 
    cd content-deleted
    ```
 
-3. **Configure `.env`**
+3. **Create `config.json`**
 
-   Create a `.env` file in the root directory with the following format:
+   Edit `config.json` file with the following format:
+
+   ```json
+   {
+     "exclusion_mode": "blacklist",
+     "excluded_guilds": ["123456789123456789","123456789123456789"],
+     "excluded_channels": ["123456789123456789"],
+     "excluded_dms": ["123456789123456789"],
+     "safe_mode": false,
+     "delete_range": "all"
+   }
    ```
-   DISCORD_TOKEN=your_token_here
 
-   # Format: [ [GUILD_ID, CHANNEL_ID], ... ]
-   # Use CHANNEL_ID 0 to skip the entire server
-   GUILD_EXCLUDE=[["992106461775798322", "0"], ["992106461775798322", "992106461775798325"]]
+   - `exclusion_mode`: `"whitelist"` deletes only from included channels; `"blacklist"` deletes everywhere *except* excluded ones.
+   - `excluded_guilds`: List of server (guild) IDs to ignore entirely.
+   - `excluded_channels`: List of channel IDs to skip. (This includes group dm channel IDs)
+   - `excluded_dms`: List of user IDs for DMs to skip.
+   - `safe_mode`: Adds delays to avoid detection — slows down deletion significantly.
+   - `delete_range`: Time range for deletion (e.g., `"24h"`, `"1w"`, `"1m"`, `"3m"`, `"6m"`, `"1y"`, `"all"`).
 
-   # Format: [USER_ID, ...] for DMs you want to exclude
-   DM_EXCLUDE=["1365788302027919430"]
-   ```
-
-4. **Install and compile**
+4. **Install dependencies**
    ```bash
    bun install
-   bun run compile
    ```
 
-5. **Start deletion**
-   In any channel or DM, type:
-   ```
-   !nuke
+5. **Start the tool**
+   ```bash
+   bun run start
    ```
 
 ---
@@ -50,8 +56,9 @@ Content Deleted is a Discord message deletion tool that deletes **every message 
 - Scans all messages sent by **your account**
 - Deletes them unless they’re:
   - In excluded channels
-  - In excluded servers (via `CHANNEL_ID = 0`)
+  - In excluded servers
   - In DMs with excluded users
+  - Out of specified timeline
 
 ---
 
