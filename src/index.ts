@@ -103,7 +103,10 @@ async function nuke(channels: Iterable<AnyChannel>, types: Set<string>, cutoff: 
                 if (!recipientId || !shouldWipe(recipientId, excludedDMs)) continue;
                 break;
             }
-            // NEED TO ADD GROUP DMS.
+            case "GROUP_DM": {
+                if (!shouldWipe(channel.id, excludedChannels)) continue;
+                break;
+            }
             default:
                 continue;
         }
