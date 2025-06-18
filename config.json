@@ -3,7 +3,10 @@
     // blacklist = only delete chats that aren't in excluded channels
     "exclusion_mode": "blacklist",
     "excluded_guilds": [], // guilds that shouldn't get wiped
-    "excluded_channels": [], // channels that shouldn't get wiped
-    "excluded_dms": [], // dms that shouldn't get wiped
-    "safe_mode": false // don't turn off if you don't want to get rate limited
+    "excluded_channels": ["992106461775798325"], // channels that shouldn't get wiped
+    "excluded_dms": ["1365788302027919430"], // dms that shouldn't get wiped
+    "safe_mode": false, // don't turn on unless discord absolutely hates you and/or youre using this while using discord
+    //Slows down process by a lot.
+
+    "delete_range": "all" // Options -> time + factor. f.x. 24h, 1w, 1m, 3m, 6m, 1y, all
 }
