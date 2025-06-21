@@ -15,8 +15,6 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"discord.js-selfbot-v13": "^3.6.1",
-		"dotenv": "^16.5.0",
-		"json5": "^2.2.3"
+		"discord.js-selfbot-v13": "^3.6.1"
 	}
 }
