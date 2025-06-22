@@ -1,15 +1,14 @@
 {
 	"name": "content-deleted",
-	"module": "index.ts",
+	"module": "src/index.ts",
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "nodemon --watch src -e ts --exec 'bun run start'",
-		"start": "tsc && bun run out"
+		"dev": "bun run --hot .",
+		"start": "bun run ."
 	},
 	"devDependencies": {
-		"@types/bun": "latest",
-		"nodemon": "^3.1.10"
+		"@types/bun": "latest"
 	},
 	"peerDependencies": {
 		"typescript": "^5"

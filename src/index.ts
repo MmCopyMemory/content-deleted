@@ -69,10 +69,6 @@ function loadConfig() {
         const unit = match[2]! as Unit;
         const multiplier = multipliers[unit as keyof typeof multipliers];
 
-        if (multiplier === undefined) {
-            throw new Error(`Invalid multiplier for unit '${unit}'`);
-        } //Thanks for nothing typescript.
-
         timeCutoff = Date.now() - parseInt(match[1]!, 10) * multiplier;
     }
 }
