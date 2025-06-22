@@ -1,15 +1,16 @@
-import { 
-    Client, 
+import {
+    Client,
     //DMChannel, 
-    Message, 
-    type ChannelLogsQueryOptions, 
-    type Snowflake, 
-    type AnyChannel 
+    Message,
+    type ChannelLogsQueryOptions,
+    type Snowflake,
+    type AnyChannel
 } from "discord.js-selfbot-v13";
 import { configDotenv } from "dotenv";
 import JSON5 from "json5";
 import assert from "node:assert";
 import fs from "node:fs";
+import { get } from "node:http";
 
 configDotenv();
 
@@ -63,13 +64,24 @@ function loadConfig() {
             w: 7 * 86400000,
             m: 30 * 86400000,
             y: 365 * 86400000,
-        };
+        } as const;
 
         type Unit = keyof typeof multipliers;
-        const unit = match[2]! as Unit;
-        const multiplier = multipliers[unit as keyof typeof multipliers];
 
-        timeCutoff = Date.now() - parseInt(match[1]!, 10) * multiplier;
+
+        function getMultiplier(unit: string): number {
+            if (!unit) {
+                throw new Error(`Invalid time unit: ${unit}`);
+            }
+
+            if (!(unit in multipliers)) {
+                throw new Error(`Unknown time unit: ${unit}`);
+            }
+
+            return multipliers[unit as Unit];
+        }
+
+        timeCutoff = Date.now() - parseInt(match[1]!, 10) * getMultiplier(match[2]!);
     }
 }
 
@@ -131,8 +143,8 @@ async function nuke(channels: Iterable<AnyChannel>, types: Set<string>, cutoff: 
                 lastMessageId = fetched.last()?.id;
                 if (!lastMessageId) break;
             }
-        } catch (excp) {
-            throw new Error("Exception: " + excp);
+        } catch (error) {
+            console.error(`Failed to nuke channel ${channel.id}:`, error);
         }
     }
 }
@@ -145,7 +157,7 @@ client.on("messageCreate", async (message: Message) => {
 
     for (const guild of client.guilds.cache.values()) {
         if (!shouldWipe(guild.id, excludedGuilds)) continue;
-        nuke(guild.channels.cache.values(), new Set(["GUILD_TEXT"]), timeCutoff);
+        await nuke(guild.channels.cache.values(), new Set(["GUILD_TEXT"]), timeCutoff);
     }
 
     nuke(client.channels.cache.values(), new Set(["DM", "GROUP_DM"]), timeCutoff);
